@@ -1,4 +1,4 @@
-name: "Build"
+name: Build & Release
 
 on:
   pull_request:
@@ -13,18 +13,17 @@ on:
       - test
 
 jobs:
-  build:
-    name: Build & Release
+  build-android:
+    name: Build Android
     runs-on: macos-latest
-
     steps:
-      # 1. Checkout Repository (fetch full history so tags are available)
+      # 1. Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # 2. Set Up Java
+      # 2. Set Up Java (needed for Android)
       - name: Set Up Java
         uses: actions/setup-java@v3.12.0
         with:
@@ -42,8 +41,8 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # 5. (Optional) Setup Keystore for Android
-      # Uncomment these steps if you require signing for Android builds
+      # 5. (Optional) Setup Keystore for Android  
+      # Uncomment the following steps if you require signing for Android builds
       # - name: Decode Keystore
       #   run: |
       #     echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/keystore.jks
@@ -62,34 +61,96 @@ jobs:
       - name: Build App Bundle
         run: flutter build appbundle
 
-      # 8. Build IPA (iOS – no codesign)
+      # 8. Upload Android Artifacts
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    steps:
+      # 1. Checkout Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # 2. Set Up Flutter
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.2"
+          channel: "stable"
+
+      # 3. Install Dependencies
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 4. Build IPA (iOS – no codesign)
       - name: Build IPA
         run: flutter build ipa --no-codesign
 
-      # 9. Compress iOS build artifacts
-      - name: Compress Archives and IPAs
+      # 5. Compress iOS Build Artifacts
+      - name: Compress iOS Build Artifacts
         run: |
           cd build
           tar -czf ios_build.tar.gz ios
 
-      # 10. Upload Artifacts using actions/upload-artifact@v4
-      - name: Upload Artifacts
+      # 6. Upload iOS Artifacts
+      - name: Upload iOS Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Releases
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
-            build/ios_build.tar.gz
+          name: ios-artifacts
+          path: build/ios_build.tar.gz
 
-      # 11. Extract version from pubspec.yaml
+  release:
+    name: Create Release
+    runs-on: macos-latest
+    needs:
+      - build-android
+      - build-ios
+    steps:
+      # 1. Checkout Repository (needed for version extraction)
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # 2. Download Android Artifacts
+      - name: Download Android Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-artifacts
+          path: android_artifacts
+
+      # 3. Download iOS Artifacts
+      - name: Download iOS Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-artifacts
+          path: ios_artifacts
+
+      # 4. Prepare Release Artifacts (copy files into one folder)
+      - name: Prepare Release Artifacts
+        run: |
+          mkdir release_artifacts
+          cp $(find android_artifacts -type f -name 'app-release.apk') release_artifacts/
+          cp $(find android_artifacts -type f -name 'app-release.aab') release_artifacts/
+          cp $(find ios_artifacts -type f -name 'ios_build.tar.gz') release_artifacts/
+
+      # 5. Extract version from pubspec.yaml
       - name: Extract version from pubspec.yaml
         id: extract_version
         run: |
           version=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
           echo "VERSION=$version" >> $GITHUB_ENV
 
-      # 12. Check if Tag Exists
+      # 6. Check if Tag Exists
       - name: Check if Tag Exists
         id: check_tag
         run: |
@@ -99,7 +160,7 @@ jobs:
             echo "TAG_EXISTS=false" >> $GITHUB_ENV
           fi
 
-      # 13. Modify Tag if it Already Exists
+      # 7. Modify Tag if it Already Exists
       - name: Modify Tag if it Exists
         if: env.TAG_EXISTS == 'true'
         id: modify_tag
@@ -107,13 +168,10 @@ jobs:
           new_version="${{ env.VERSION }}-build-${{ github.run_number }}"
           echo "VERSION=$new_version" >> $GITHUB_ENV
 
-      # 14. Create Release using the computed tag version
+      # 8. Create Release using the computed tag version
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
-            build/ios_build.tar.gz
+          artifacts: release_artifacts
           tag: v${{ env.VERSION }}
           token: ${{ secrets.TOKEN }}
