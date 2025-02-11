@@ -42,17 +42,17 @@ dependencies:
   flutter_screenutil: ^5.9.0
   http: ^1.1.2
   logger: ^2.0.2+1
-  intl: ^0.19.0
+  intl: ^0.20.2
   url_launcher: ^6.2.2
   get_storage: ^2.1.1
-  auth_buttons: ^1.0.1+4
+  auth_buttons: ^3.0.3
   flutter_svg: ^2.0.9
   google_nav_bar: ^5.0.6
-  firebase_core: ^2.24.2
+  firebase_core: ^3.11.0
   flutter_native_splash: ^2.3.8
   connectivity_plus: ^5.0.2
-  firebase_auth: ^4.15.3
-  cloud_firestore: ^4.13.6
+  firebase_auth: ^5.4.2
+  cloud_firestore: ^5.6.3
   google_sign_in: ^6.2.1
 
 dev_dependencies:
@@ -64,7 +64,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^2.0.0
+  flutter_lints: ^5.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
