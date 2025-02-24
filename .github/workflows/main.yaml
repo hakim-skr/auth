@@ -16,6 +16,7 @@ jobs:
   build-android:
     name: Build Android
     runs-on: macos-latest
+    needs: build-simulator
     steps:
       # 1. Checkout Repository
       - name: Checkout Repository
@@ -73,6 +74,7 @@ jobs:
   build-ios:
     name: Build iOS
     runs-on: macos-latest
+    needs: build-simulator
     steps:
       # 1. Checkout Repository
       - name: Checkout Repository
@@ -108,12 +110,50 @@ jobs:
           name: ios-artifacts
           path: build/ios_build.tar.gz
 
+    # ------------------------------------------
+  # Job 2: Build and upload the Simulator .app
+  # ------------------------------------------
+  build-simulator:
+    name: Build Simulator
+    runs-on: macos-latest
+    steps:
+      # 1. Checkout Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      # 2. Set Up Flutter
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.4"
+          channel: "stable"
+          cache: true
+      # 3. Install Dependencies
+      - name: Install Dependencies
+        run: flutter pub get
+      # 4. Build Simulator App
+      - name: Build Simulator App
+        run: flutter build ios --simulator
+      # 5. Zip Simulator Build
+      - name: Zip Simulator Build
+        run: |
+          cd build/ios/iphonesimulator
+          zip -r Runner.app.zip Runner.app
+      # 6. Upload Simulator App
+      - name: Upload Simulator App
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator
+          path: build/ios/iphonesimulator/Runner.app.zip
+
   release:
     name: Create Release
     runs-on: macos-latest
     needs:
       - build-android
       - build-ios
+      - build-simulator
     steps:
       # 1. Checkout Repository (needed for version extraction)
       - name: Checkout Repository
