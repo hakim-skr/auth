@@ -134,7 +134,7 @@ jobs:
         run: flutter pub get
       # 4. Build Simulator App
       - name: Build Simulator App
-        run: flutter build ios --simulator
+        run: flutter build ios --simulator --no-codesign --build-name=1.0.0 --build-number=1
       # 5. Zip Simulator Build
       - name: Zip Simulator Build
         run: |
